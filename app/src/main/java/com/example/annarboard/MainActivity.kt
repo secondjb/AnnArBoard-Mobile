@@ -54,6 +54,8 @@ import com.example.annarboard.ui.theme.AnnArBoardTheme
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
+import android.os.Build
+
 class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -69,8 +71,8 @@ class MainActivity : ComponentActivity() {
                 val currentTheme = settingsManager.currentSettings.value.appTheme
                 AnnArBoardTheme(appTheme = currentTheme) {
                     MainScreen(
-                        onStartTrackingService = { origin, dest ->
-                            startTrackingService(origin, dest)
+                        onStartTrackingService = { origin, dest, busId ->
+                            startTrackingService(origin, dest, busId)
                         }
                     )
                 }
@@ -90,12 +92,24 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    private fun startTrackingService(origin: String, destination: String) {
-        val serviceIntent = Intent(this, TrackingService::class.java).apply {
-            putExtra("ORIGIN_HUB", origin)
-            putExtra("DESTINATION_HUB", destination)
+    private fun startTrackingService(origin: String, destination: String, busId: String? = null) {
+        if (Build.VERSION.SDK_INT >= 33) {
+            if (checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+                requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS), 101)
+            }
         }
-        startForegroundService(serviceIntent)
+
+        val serviceIntent = Intent(this, TrackingService::class.java).apply {
+            action = TrackingService.ACTION_START_TRACKING
+            putExtra(TrackingService.EXTRA_ORIGIN_HUB, origin)
+            putExtra(TrackingService.EXTRA_DESTINATION_HUB, destination)
+            busId?.let { putExtra(TrackingService.EXTRA_BUS_ID, it) }
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            startForegroundService(serviceIntent)
+        } else {
+            startService(serviceIntent)
+        }
     }
 }
 
@@ -159,7 +173,7 @@ fun isOnMobileData(context: Context): Boolean {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun MainScreen(onStartTrackingService: (String, String) -> Unit) {
+fun MainScreen(onStartTrackingService: (String, String, String?) -> Unit) {
     val context = LocalContext.current
     val settings = LocalSettingsManager.current.currentSettings.value
 
@@ -363,7 +377,13 @@ fun MainScreen(onStartTrackingService: (String, String) -> Unit) {
             }
             
             if (settings.showActionBoard) {
-                ActionBoard(alerts = alerts, loading = loading)
+                ActionBoard(
+                    alerts = alerts,
+                    loading = loading,
+                    onStartTracking = { alert ->
+                        onStartTrackingService(originHub.key, destHub.key, alert.bus)
+                    }
+                )
             }
 
             if (settings.showUpcomingDepartures) {

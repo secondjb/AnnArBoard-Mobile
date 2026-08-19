@@ -1,3 +1,5 @@
 <resources>
     <string name="app_name">AnnArBoard</string>
+    <string name="widget_name">MBus Next Arrivals</string>
+    <string name="widget_description">Live Michigan Bus arrival countdowns for Central &amp; North Campus.</string>
 </resources>

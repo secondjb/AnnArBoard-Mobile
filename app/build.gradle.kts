@@ -51,6 +51,8 @@ dependencies {
 	implementation(libs.androidx.lifecycle.runtime.ktx)
 	implementation(libs.retrofit)
 	implementation(libs.retrofit.converter.gson)
+	implementation(libs.androidx.glance)
+	implementation(libs.androidx.glance.material3)
 	testImplementation(libs.junit)
 	androidTestImplementation(platform(libs.androidx.compose.bom))
 	androidTestImplementation(libs.androidx.compose.ui.test.junit4)

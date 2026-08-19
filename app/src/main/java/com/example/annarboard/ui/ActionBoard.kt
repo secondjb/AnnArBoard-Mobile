@@ -5,6 +5,8 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.DirectionsBus
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -32,7 +34,8 @@ data class BusAlert(
 fun ActionBoard(
     alerts: List<BusAlert>,
     loading: Boolean,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onStartTracking: ((BusAlert) -> Unit)? = null
 ) {
     Column(
         modifier = modifier
@@ -68,7 +71,7 @@ fun ActionBoard(
             modifier = Modifier.fillMaxWidth()
         ) {
             alerts.forEachIndexed { index, alert ->
-                ActionBoardCard(alert = alert, index = index)
+                ActionBoardCard(alert = alert, index = index, onStartTracking = onStartTracking)
             }
         }
     }
@@ -97,7 +100,11 @@ fun getMuiContrastText(bg: Color): Color {
 }
 
 @Composable
-fun ActionBoardCard(alert: BusAlert, index: Int) {
+fun ActionBoardCard(
+    alert: BusAlert,
+    index: Int,
+    onStartTracking: ((BusAlert) -> Unit)? = null
+) {
     val baseColor = MaterialTheme.colorScheme.primary
     val isDark = MaterialTheme.colorScheme.background.luminance() < 0.5f
 
@@ -113,54 +120,73 @@ fun ActionBoardCard(alert: BusAlert, index: Int) {
     // Web uses theme.palette.primary.light. MUI dynamically creates this by lightening the main color by ~20-30%
     val lightColor = baseColor.muiLighten(0.25f)
 
-    ElevatedCard(
+    Box(
         modifier = Modifier
             .fillMaxWidth()
-            .shadow(4.dp, RoundedCornerShape(12.dp)),
-        shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.elevatedCardColors(containerColor = bg)
+            .shadow(4.dp, RoundedCornerShape(12.dp))
     ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                // Matching Web py={3} (24dp) and gap
-                .padding(horizontal = 16.dp, vertical = 24.dp),
-            verticalAlignment = Alignment.CenterVertically
+        ElevatedCard(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(12.dp),
+            colors = CardDefaults.elevatedCardColors(containerColor = bg)
         ) {
-            // Matching Web Traffic Light Circle: bgcolor: mode === 'dark' ? 'rgba(0,0,0,0.3)' : 'rgba(255,255,255,0.6)'
-            Box(
+            Row(
                 modifier = Modifier
-                    .size(48.dp)
-                    .background(if (isDark) Color.Black.copy(alpha = 0.3f) else Color.White.copy(alpha = 0.6f), CircleShape)
-                    .padding(12.dp),
-                contentAlignment = Alignment.Center
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 20.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
                 Box(
                     modifier = Modifier
-                        .fillMaxSize()
-                        .clip(CircleShape)
-                        .background(lightColor)
-                        // Using spotColor matches the exact CSS boxShadow spread from the web
-                        .shadow(elevation = 12.dp, shape = CircleShape, ambientColor = lightColor, spotColor = lightColor)
-                )
+                        .size(44.dp)
+                        .background(if (isDark) Color.Black.copy(alpha = 0.3f) else Color.White.copy(alpha = 0.6f), CircleShape)
+                        .padding(10.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .clip(CircleShape)
+                            .background(lightColor)
+                            .shadow(elevation = 12.dp, shape = CircleShape, ambientColor = lightColor, spotColor = lightColor)
+                    )
+                }
+
+                Spacer(modifier = Modifier.width(16.dp))
+
+                Column(modifier = Modifier.weight(1f)) {
+                    val s = if (alert.leaveInMinutes != 1) "s" else ""
+                    Text(
+                        text = "Arriving in ${alert.leaveInMinutes} min$s for ${alert.bus}",
+                        color = textColor,
+                        fontWeight = FontWeight.ExtraBold,
+                        fontSize = 20.sp
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = "at ${alert.location}",
+                        color = textColor.copy(alpha = 0.9f),
+                        fontWeight = FontWeight.Medium,
+                        fontSize = 15.sp
+                    )
+                }
             }
+        }
 
-            Spacer(modifier = Modifier.width(32.dp))
-
-            Column {
-                val s = if (alert.leaveInMinutes != 1) "s" else ""
-                Text(
-                    text = "Arriving in ${alert.leaveInMinutes} min$s for ${alert.bus}",
-                    color = textColor,
-                    fontWeight = FontWeight.ExtraBold,
-                    fontSize = 22.sp
-                )
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    text = "at ${alert.location}",
-                    color = textColor.copy(alpha = 0.9f),
-                    fontWeight = FontWeight.Medium,
-                    fontSize = 16.sp
+        if (onStartTracking != null) {
+            IconButton(
+                onClick = { onStartTracking(alert) },
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .padding(8.dp)
+                    .size(36.dp)
+                    .background(textColor.copy(alpha = 0.18f), CircleShape)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.DirectionsBus,
+                    contentDescription = "Track Live",
+                    tint = textColor,
+                    modifier = Modifier.size(20.dp)
                 )
             }
         }
