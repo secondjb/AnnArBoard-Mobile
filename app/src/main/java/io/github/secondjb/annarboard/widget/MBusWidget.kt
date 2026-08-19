@@ -37,6 +37,11 @@ import java.util.Calendar
 import java.util.Date
 import java.util.Locale
 
+import android.content.Intent
+import androidx.glance.LocalContext
+import androidx.glance.appwidget.action.actionStartService
+import io.github.secondjb.annarboard.R
+import io.github.secondjb.annarboard.service.TrackingService
 import androidx.glance.Image
 import androidx.glance.ImageProvider
 import androidx.glance.ColorFilter
@@ -65,6 +70,14 @@ class MBusWidget : GlanceAppWidget() {
 
         val isNorthToCentral = campus.equals("north_to_central", ignoreCase = true)
         val titleText = if (isNorthToCentral) "North → CCTC" else "CCTC → North"
+
+        val context = LocalContext.current
+        val (originKey, destKey) = if (isNorthToCentral) "pierpont" to "cctc" else "cctc" to "pierpont"
+        val startTrackingIntent = Intent(context, TrackingService::class.java).apply {
+            action = TrackingService.ACTION_START_TRACKING
+            putExtra(TrackingService.EXTRA_ORIGIN_HUB, originKey)
+            putExtra(TrackingService.EXTRA_DESTINATION_HUB, destKey)
+        }
 
         val arrivals: List<BusArrivalItem> = if (!json.isNullOrEmpty()) {
             try {
@@ -141,8 +154,8 @@ class MBusWidget : GlanceAppWidget() {
                         contentAlignment = Alignment.Center
                     ) {
                         Image(
-                            provider = ImageProvider(android.R.drawable.ic_menu_directions),
-                            contentDescription = "Track Live",
+                            provider = ImageProvider(R.drawable.ic_notification_bell),
+                            contentDescription = "Track Live Notification",
                             modifier = GlanceModifier.size(16.dp),
                             colorFilter = ColorFilter.tint(GlanceTheme.colors.onPrimary)
                         )

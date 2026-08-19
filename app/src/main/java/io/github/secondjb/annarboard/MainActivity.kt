@@ -93,17 +93,29 @@ class MainActivity : ComponentActivity() {
         handleIntent(intent)
     }
 
+    private var pendingOrigin: String? = null
+    private var pendingDestination: String? = null
+
     private fun handleIntent(intent: Intent?) {
         if (intent?.action == Intent.ACTION_VIEW && intent.data?.scheme == "annarboard") {
             Log.d("MainActivity", "Deep link triggered: ${intent.data}")
             startTrackingService("cctc", "pierpont")
+        } else if (intent?.getBooleanExtra("EXTRA_REQUEST_TRACKING_PERMISSION", false) == true) {
+            val origin = intent.getStringExtra(TrackingService.EXTRA_ORIGIN_HUB) ?: "cctc"
+            val dest = intent.getStringExtra(TrackingService.EXTRA_DESTINATION_HUB) ?: "pierpont"
+            pendingOrigin = origin
+            pendingDestination = dest
+            startTrackingService(origin, dest)
         }
     }
 
     private fun startTrackingService(origin: String, destination: String, busId: String? = null) {
+        pendingOrigin = origin
+        pendingDestination = destination
         if (Build.VERSION.SDK_INT >= 33) {
             if (checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != android.content.pm.PackageManager.PERMISSION_GRANTED) {
                 requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS), 101)
+                return
             }
         }
 
@@ -117,6 +129,21 @@ class MainActivity : ComponentActivity() {
             startForegroundService(serviceIntent)
         } else {
             startService(serviceIntent)
+        }
+    }
+
+    override fun onRequestPermissionsResult(
+        requestCode: Int,
+        permissions: Array<out String>,
+        grantResults: IntArray
+    ) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        if (requestCode == 101) {
+            if (grantResults.isNotEmpty() && grantResults[0] == android.content.pm.PackageManager.PERMISSION_GRANTED) {
+                val origin = pendingOrigin ?: "cctc"
+                val dest = pendingDestination ?: "pierpont"
+                startTrackingService(origin, dest)
+            }
         }
     }
 }
