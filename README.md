@@ -1,4 +1,4 @@
-# Ann Ar-Board Mobile 🚌
+# Ann Ar-Board Mobile
 
 [![Android API Level](https://img.shields.io/badge/API-28%2B-brightgreen.svg?style=flat&logo=android)](https://developer.android.com)
 [![Kotlin](https://img.shields.io/badge/Kotlin-2.0%2B-purple.svg?style=flat&logo=kotlin)](https://kotlinlang.org)
@@ -16,29 +16,29 @@ Built with **Kotlin**, **Jetpack Compose**, **Material 3**, **Jetpack Glance**, 
   <table>
     <tr>
       <td align="center" valign="top" width="33%">
-        <strong>📱 Main Dashboard</strong><br><br>
+        <strong>Main Dashboard</strong><br><br>
         <img src="./.github/assets/main_dashboard.jpg" alt="Main Dashboard View" width="220"/>
       </td>
       <td align="center" valign="top" width="33%">
-        <strong>⚙️ Control Center</strong><br><br>
+        <strong>Control Center</strong><br><br>
         <img src="./.github/assets/settings_control_center.jpg" alt="Control Center & Settings" width="220"/>
       </td>
       <td align="center" valign="top" width="33%">
-        <strong>🎯 Hub Selector Modal</strong><br><br>
+        <strong>Hub Selector Modal</strong><br><br>
         <img src="./.github/assets/stop_selector.jpg" alt="Hub & Stop Selector" width="220"/>
       </td>
     </tr>
     <tr>
       <td align="center" valign="top" width="33%">
-        <strong>🧩 Home Screen Widget</strong><br><br>
+        <strong>Home Screen Widget</strong><br><br>
         <img src="./.github/assets/homescreen_widget.jpg" alt="Jetpack Glance Home Screen Widget" width="220"/>
       </td>
       <td align="center" valign="top" width="33%">
-        <strong>🛠️ Widget Configuration</strong><br><br>
+        <strong>Widget Configuration</strong><br><br>
         <img src="./.github/assets/widget_config.jpg" alt="Widget Config Activity" width="220"/>
       </td>
       <td align="center" valign="top" width="33%">
-        <strong>🔔 Live Notification</strong><br><br>
+        <strong>Live Notification</strong><br><br>
         <img src="./.github/assets/live_tracking_notification.jpg" alt="Live Foreground Service Notification" width="220"/>
       </td>
     </tr>
