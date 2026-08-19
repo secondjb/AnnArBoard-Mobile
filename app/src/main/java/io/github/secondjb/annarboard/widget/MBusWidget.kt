@@ -39,7 +39,9 @@ import java.util.Locale
 
 import android.content.Intent
 import androidx.glance.LocalContext
+import androidx.glance.appwidget.action.actionStartActivity
 import androidx.glance.appwidget.action.actionStartService
+import io.github.secondjb.annarboard.MainActivity
 import io.github.secondjb.annarboard.R
 import io.github.secondjb.annarboard.service.TrackingService
 import androidx.glance.Image
@@ -105,21 +107,27 @@ class MBusWidget : GlanceAppWidget() {
                     modifier = GlanceModifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Column(modifier = GlanceModifier.defaultWeight()) {
+                    Column(
+                        modifier = GlanceModifier
+                            .defaultWeight()
+                            .clickable(actionStartActivity(Intent(context, MainActivity::class.java)))
+                    ) {
                         Text(
                             text = titleText,
                             style = TextStyle(
                                 color = GlanceTheme.colors.onSurface,
                                 fontSize = 16.sp,
                                 fontWeight = FontWeight.Bold
-                            )
+                            ),
+                            maxLines = 1
                         )
                         Text(
                             text = formatTimestamp(lastUpdated, isLoading),
                             style = TextStyle(
                                 color = GlanceTheme.colors.onSurfaceVariant,
                                 fontSize = 11.sp
-                            )
+                            ),
+                            maxLines = 1
                         )
                     }
 
@@ -242,7 +250,7 @@ class MBusWidget : GlanceAppWidget() {
             val sdf = SimpleDateFormat("h:mm", Locale.getDefault())
             sdf.format(Date(arrivalMillis))
         } else {
-            if (bus.minutes == 0) "NOW" else "${bus.minutes}m"
+            if (bus.minutes == 0) "Now" else "${bus.minutes}m"
         }
 
         val etaBg = if (bus.minutes <= 2) GlanceTheme.colors.error else GlanceTheme.colors.primaryContainer
@@ -275,7 +283,8 @@ class MBusWidget : GlanceAppWidget() {
                         color = GlanceTheme.colors.onPrimary,
                         fontSize = 13.sp,
                         fontWeight = FontWeight.Bold
-                    )
+                    ),
+                    maxLines = 1
                 )
             }
 
@@ -298,9 +307,10 @@ class MBusWidget : GlanceAppWidget() {
             // Countdown Pill
             Box(
                 modifier = GlanceModifier
+                    .width(50.dp)
                     .background(etaBg)
                     .cornerRadius(6.dp)
-                    .padding(horizontal = 8.dp, vertical = 3.dp),
+                    .padding(vertical = 3.dp),
                 contentAlignment = Alignment.Center
             ) {
                 Text(
@@ -309,7 +319,8 @@ class MBusWidget : GlanceAppWidget() {
                         color = etaTextColor,
                         fontSize = 12.sp,
                         fontWeight = FontWeight.Bold
-                    )
+                    ),
+                    maxLines = 1
                 )
             }
         }
