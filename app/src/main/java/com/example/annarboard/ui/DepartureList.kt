@@ -98,17 +98,38 @@ fun DepartureRow(departure: DepartureInfo, use24HourClock: Boolean) {
             }
             Spacer(modifier = Modifier.width(16.dp))
             Column {
+                val displayLocation = cleanLocationName(departure.location)
                 Text(departure.busLine, fontWeight = FontWeight.ExtraBold, fontSize = 18.sp, color = MaterialTheme.colorScheme.onSurface)
-                Text("at ${departure.location}", fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.8f))
+                Text("at $displayLocation", fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.8f))
             }
         }
-        Column(horizontalAlignment = Alignment.End) {
+        Column(
+            horizontalAlignment = Alignment.End,
+            verticalArrangement = Arrangement.Center
+        ) {
             val parts = formattedTime.split(" ")
             if (parts.size == 2) {
-                Text(parts[0], fontWeight = FontWeight.ExtraBold, fontSize = 22.sp, color = MaterialTheme.colorScheme.primary)
-                Text(parts[1], fontWeight = FontWeight.Bold, fontSize = 16.sp, color = MaterialTheme.colorScheme.primary)
+                Text(
+                    text = parts[0],
+                    fontWeight = FontWeight.ExtraBold,
+                    fontSize = 22.sp,
+                    color = MaterialTheme.colorScheme.primary,
+                    lineHeight = 22.sp
+                )
+                Text(
+                    text = parts[1],
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 11.sp,
+                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.8f),
+                    lineHeight = 11.sp
+                )
             } else {
-                Text(formattedTime, fontWeight = FontWeight.ExtraBold, fontSize = 20.sp, color = MaterialTheme.colorScheme.primary)
+                Text(
+                    text = formattedTime,
+                    fontWeight = FontWeight.ExtraBold,
+                    fontSize = 20.sp,
+                    color = MaterialTheme.colorScheme.primary
+                )
             }
         }
     }

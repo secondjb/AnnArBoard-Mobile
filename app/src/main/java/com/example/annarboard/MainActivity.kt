@@ -11,9 +11,16 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.annotation.RequiresPermission
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.ui.res.painterResource
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -24,6 +31,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.DirectionsBus
 import androidx.compose.material.icons.filled.SwapVert
 import androidx.compose.material.icons.filled.LocationOn
+import androidx.compose.material.icons.filled.NotificationsActive
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.*
@@ -278,6 +286,10 @@ fun MainScreen(onStartTrackingService: (String, String, String?) -> Unit) {
         }
     }
 
+    val scrollState = rememberScrollState()
+    val isNearBottom = remember(scrollState.value, scrollState.maxValue) {
+        scrollState.maxValue > 0 && (scrollState.maxValue - scrollState.value) < 180
+    }
     val scrollBehavior = TopAppBarDefaults.enterAlwaysScrollBehavior(rememberTopAppBarState())
 
     Scaffold(
@@ -334,13 +346,39 @@ fun MainScreen(onStartTrackingService: (String, String, String?) -> Unit) {
                 ),
                 scrollBehavior = scrollBehavior
             )
+        },
+        floatingActionButton = {
+            if (settings.showLiveTrackingFab) {
+                AnimatedVisibility(
+                    visible = !isNearBottom,
+                    enter = fadeIn() + slideInVertically { it / 2 },
+                    exit = fadeOut() + slideOutVertically { it / 2 }
+                ) {
+                    val primaryBg = MaterialTheme.colorScheme.primary
+                    val cardTextColor = getMuiContrastText(primaryBg)
+                    ExtendedFloatingActionButton(
+                        onClick = {
+                            onStartTrackingService(originHub.key, destHub.key, null)
+                        },
+                        icon = {
+                            Icon(
+                                imageVector = Icons.Default.NotificationsActive,
+                                contentDescription = "Track Live"
+                            )
+                        },
+                        text = { Text("Track Live", fontWeight = FontWeight.ExtraBold) },
+                        containerColor = primaryBg,
+                        contentColor = cardTextColor
+                    )
+                }
+            }
         }
     ) { innerPadding ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
-                .verticalScroll(rememberScrollState())
+                .verticalScroll(scrollState)
         ) {
             RouteHeader(
                 departure = originHub.name,
@@ -379,10 +417,7 @@ fun MainScreen(onStartTrackingService: (String, String, String?) -> Unit) {
             if (settings.showActionBoard) {
                 ActionBoard(
                     alerts = alerts,
-                    loading = loading,
-                    onStartTracking = { alert ->
-                        onStartTrackingService(originHub.key, destHub.key, alert.bus)
-                    }
+                    loading = loading
                 )
             }
 

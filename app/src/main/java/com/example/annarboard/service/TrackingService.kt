@@ -14,6 +14,7 @@ import com.example.annarboard.network.Constants
 import com.example.annarboard.network.RetrofitClient
 import com.example.annarboard.theme.SettingsManager
 import android.util.Log
+import android.util.TypedValue
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -25,7 +26,9 @@ data class BusTrackingData(
     val primaryEtaText: String,
     val arrivalTimeText: String,
     val upcomingText: String,
-    val progress: Int
+    val progress: Int,
+    val arrivalTimeMillis: Long = 0L,
+    val nextBusMins: Int = 0
 )
 
 class TrackingService : Service() {
@@ -34,10 +37,15 @@ class TrackingService : Service() {
         const val ACTION_START_TRACKING = "com.example.annarboard.START_TRACKING"
         const val ACTION_STOP_TRACKING = "com.example.annarboard.STOP_TRACKING"
         const val ACTION_REVERSE_DIRECTION = "com.example.annarboard.REVERSE_DIRECTION"
+        const val ACTION_CYCLE_BUS_ROUTE = "com.example.annarboard.CYCLE_BUS_ROUTE"
         
         const val EXTRA_ORIGIN_HUB = "ORIGIN_HUB"
         const val EXTRA_DESTINATION_HUB = "DESTINATION_HUB"
         const val EXTRA_BUS_ID = "BUS_ID"
+
+        @Volatile
+        var isServiceRunning = false
+            private set
     }
 
     private val job = SupervisorJob()
@@ -46,18 +54,21 @@ class TrackingService : Service() {
     private var originKey = "cctc"
     private var destinationKey = "pierpont"
     private var targetBusId: String? = null
+    private var availableRoutesList: List<String> = emptyList()
     
     private var pollingJob: Job? = null
     private var isArrivalCountdownStarted = false
 
-    private val CHANNEL_ID = "BusTracker_Public_v5"
+    private val CHANNEL_ID = "bus_tracker_live"
 
     override fun onCreate() {
         super.onCreate()
+        isServiceRunning = true
         createNotificationChannel()
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        isServiceRunning = true
         val action = intent?.action
 
         if (action == ACTION_STOP_TRACKING) {
@@ -69,6 +80,19 @@ class TrackingService : Service() {
             val temp = originKey
             originKey = destinationKey
             destinationKey = temp
+            isArrivalCountdownStarted = false
+            triggerPoll()
+            return START_STICKY
+        }
+
+        if (action == ACTION_CYCLE_BUS_ROUTE) {
+            if (availableRoutesList.isNotEmpty()) {
+                val options = listOf(null) + availableRoutesList
+                val currentIdx = options.indexOf(targetBusId)
+                val nextIdx = (currentIdx + 1) % options.size
+                targetBusId = options[nextIdx]
+                Log.d("TrackingService", "Cycled route to: $targetBusId")
+            }
             isArrivalCountdownStarted = false
             triggerPoll()
             return START_STICKY
@@ -144,6 +168,8 @@ class TrackingService : Service() {
                 }
             }
 
+            availableRoutesList = filtered.map { it.rt }.distinct()
+
             if (!targetBusId.isNullOrEmpty()) {
                 val targeted = filtered.filter { it.rt.equals(targetBusId, ignoreCase = true) }
                 if (targeted.isNotEmpty()) filtered = targeted
@@ -154,11 +180,11 @@ class TrackingService : Service() {
                 p to mins
             }.sortedBy { it.second }
 
-            val title = "${cleanHubName(originHub.name)} → ${cleanHubName(destHub.name)}"
+            val baseTitle = "${cleanHubName(originHub.name)} → ${cleanHubName(destHub.name)}"
 
             if (sortedArrivals.isEmpty()) {
                 val emptyData = BusTrackingData(
-                    title = title,
+                    title = "$baseTitle · MBus · No buses",
                     primaryRoute = "MBus",
                     primaryEtaText = "No buses",
                     arrivalTimeText = "No scheduled buses found",
@@ -174,20 +200,38 @@ class TrackingService : Service() {
             val nextBusMins = nextBus.second
             val primaryRoute = nextBus.first.rt
 
+            val etaDisplay = if (nextBusMins == 0) "Now" else "${nextBusMins}m"
+            val title = "$baseTitle · $primaryRoute · $etaDisplay"
+
             val primaryEtaText = if (nextBusMins == 0) "NOW" else "$nextBusMins min"
             val tripDur = estimateTripDuration(primaryRoute)
+            val stopsCount = estimateStopsCount(primaryRoute)
             val arrivalTimeMillis = System.currentTimeMillis() + nextBusMins * 60 * 1000L
             val sdf = SimpleDateFormat("h:mm a", Locale.getDefault())
-            val arrivalTimeText = "Arrives ~${sdf.format(Date(arrivalTimeMillis))} · $tripDur min ride"
+            
+            val routePrefix = if (!targetBusId.isNullOrEmpty()) "Tracking $targetBusId · " else ""
+            val arrivalTimeText = if (nextBusMins <= 0) {
+                "Bus ($primaryRoute) has arrived at ${cleanHubName(originHub.name)}! Ride $stopsCount stops to ${cleanHubName(destHub.name)}."
+            } else {
+                "${routePrefix}Arrives ${sdf.format(Date(arrivalTimeMillis))} · $tripDur min ride ($stopsCount stops)"
+            }
 
             val upcomingList = topArrivals.drop(1)
             val upcomingText = if (upcomingList.isNotEmpty()) {
-                "Also coming: " + upcomingList.joinToString(", ") { (_, m) -> if (m == 0) "NOW" else "$m min" }
+                "Also: " + upcomingList.joinToString(", ") { (p, m) ->
+                    val mStr = if (m == 0) "NOW" else "$m min"
+                    "${p.rt} ($mStr)"
+                }
             } else {
                 "No other upcoming buses"
             }
 
-            val progress = ((15 - nextBusMins).coerceIn(0, 15).toFloat() / 15f * 100).toInt()
+            // Calculate progress percentage based on total trip duration (0% = start of trip, 100% = NOW)
+            val totalMinutes = tripDur.coerceAtLeast(1)
+            val remainingMinutes = nextBusMins
+            val progressPercent = ((totalMinutes - remainingMinutes).toFloat() / totalMinutes * 100).toInt().coerceIn(0, 100)
+
+            Log.d("BusNotif", "Updating progress: $progressPercent% | Next bus: ${nextBusMins}min")
 
             val trackingData = BusTrackingData(
                 title = title,
@@ -195,7 +239,9 @@ class TrackingService : Service() {
                 primaryEtaText = primaryEtaText,
                 arrivalTimeText = arrivalTimeText,
                 upcomingText = upcomingText,
-                progress = progress
+                progress = progressPercent,
+                arrivalTimeMillis = arrivalTimeMillis,
+                nextBusMins = nextBusMins
             )
 
             updateNotification(trackingData)
@@ -206,7 +252,7 @@ class TrackingService : Service() {
                 scope.launch {
                     val arrivalData = trackingData.copy(
                         primaryEtaText = "ARRIVED",
-                        arrivalTimeText = "Bus has arrived at ${cleanHubName(originHub.name)}!",
+                        arrivalTimeText = "Bus has arrived at ${cleanHubName(originHub.name)}! Ride $stopsCount stops to ${cleanHubName(destHub.name)}.",
                         upcomingText = "Tracker auto-closing in 60s...",
                         progress = 100
                     )
@@ -240,14 +286,33 @@ class TrackingService : Service() {
         }
     }
 
+    private fun estimateStopsCount(route: String): Int {
+        return when (route.uppercase()) {
+            "CN", "CS" -> 6
+            "NW" -> 5
+            "BB" -> 7
+            "WX" -> 4
+            else -> 5
+        }
+    }
+
     private fun cleanHubName(name: String): String {
         return name
+            .replace("Central Campus Transit Center", "CCTC", ignoreCase = true)
             .replace("Central Campus (CCTC)", "CCTC", ignoreCase = true)
             .replace("Central Campus", "CCTC", ignoreCase = true)
-            .replace("Pierpont Commons", "Pierpont", ignoreCase = true)
+            .replace("North Campus (Pierpont)", "North", ignoreCase = true)
+            .replace("North Campus", "North", ignoreCase = true)
+            .replace("Pierpont Commons", "North", ignoreCase = true)
+            .replace("Pierpont", "North", ignoreCase = true)
+            .replace(Regex("Ruthven\\s+Mue?seum?s?", RegexOption.IGNORE_CASE), "Ruthven")
+            .replace(":", " ")
+            .replace(Regex("\\s+"), " ")
+            .trim()
     }
 
     private fun stopTrackingAndSelf() {
+        isServiceRunning = false
         job.cancel()
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
             stopForeground(STOP_FOREGROUND_REMOVE)
@@ -260,12 +325,26 @@ class TrackingService : Service() {
 
     private fun updateNotification(data: BusTrackingData) {
         val notificationManager = getSystemService(NotificationManager::class.java)
-        notificationManager.notify(1, buildNotification(data))
+        val notification = buildNotification(data)
+        notificationManager.notify(1, notification)
+
+        if (Build.VERSION.SDK_INT >= 36) {
+            try {
+                val canPost = notificationManager.canPostPromotedNotifications()
+                Log.d("BusNotif", "Can post promoted notifications: $canPost")
+
+                val activeNotifs = notificationManager.activeNotifications
+                activeNotifs.find { it.id == 1 }?.let {
+                    val isPromoted = (it.notification.flags and Notification.FLAG_PROMOTED_ONGOING) != 0
+                    Log.d("BusNotif", "Notification is promoted: $isPromoted")
+                }
+            } catch (e: Throwable) {
+                Log.e("BusNotif", "Error checking promoted status: ${e.message}")
+            }
+        }
     }
 
     private fun buildNotification(data: BusTrackingData): Notification {
-        Log.d("BusNotif", "Inflating RemoteViews for ${data.title}...")
-
         val reverseIntent = Intent(this, TrackingService::class.java).apply {
             action = ACTION_REVERSE_DIRECTION
         }
@@ -282,15 +361,85 @@ class TrackingService : Service() {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
-        // Collapsed RemoteViews
+        if (Build.VERSION.SDK_INT >= 36) {
+            return buildApi36LiveNotification(data, pendingReverse, pendingStop)
+        } else {
+            return buildLegacyNotification(data, pendingReverse, pendingStop)
+        }
+    }
+
+    @RequiresApi(36)
+    private fun buildApi36LiveNotification(
+        data: BusTrackingData,
+        pendingReverse: PendingIntent,
+        pendingStop: PendingIntent
+    ): Notification {
+        val extras = Bundle().apply {
+            putBoolean("android.requestPromotedOngoing", true)
+            putBoolean(Notification.EXTRA_REQUEST_PROMOTED_ONGOING, true)
+        }
+
+        val chipText = "${data.primaryRoute} ${if (data.nextBusMins <= 0) "Now" else "${data.nextBusMins}m"}"
+
+        val contentText = data.arrivalTimeText
+
+        val segmentColor = android.graphics.Color.parseColor("#0057B7")
+        val progressStyle = Notification.ProgressStyle()
+            .setProgress(data.progress)
+            .setProgressSegments(listOf(
+                Notification.ProgressStyle.Segment(100)
+                    .setColor(segmentColor)
+            ))
+            .setProgressTrackerIcon(
+                android.graphics.drawable.Icon.createWithResource(this, R.drawable.ic_bus_circle_white)
+            )
+
+        val builder = Notification.Builder(this, CHANNEL_ID)
+            .setSmallIcon(R.drawable.ic_bus)
+            .setContentTitle(data.title)
+            .setContentText(contentText)
+            .setSubText(data.upcomingText)
+            .setShortCriticalText(chipText)
+            .setOngoing(true)
+            .setOnlyAlertOnce(true)
+            .setVisibility(Notification.VISIBILITY_PUBLIC)
+            .setCategory(Notification.CATEGORY_NAVIGATION)
+            .setRequestPromotedOngoing(true)
+            .setStyle(progressStyle)
+            .addExtras(extras)
+            .addAction(R.drawable.ic_action_reverse, "Reverse Route", pendingReverse)
+            .addAction(R.drawable.ic_action_stop, "Stop Tracking", pendingStop)
+
+        if (data.arrivalTimeMillis > 0L) {
+            builder.setWhen(data.arrivalTimeMillis)
+            builder.setShowWhen(true)
+        }
+
+        val notification = builder.build()
+        notification.flags = notification.flags or Notification.FLAG_ONGOING_EVENT
+        return notification
+    }
+
+    private fun buildLegacyNotification(
+        data: BusTrackingData,
+        pendingReverse: PendingIntent,
+        pendingStop: PendingIntent
+    ): Notification {
+        Log.d("BusNotif", "Inflating RemoteViews for legacy fallback: ${data.title}...")
+
         val compactViews = RemoteViews(packageName, R.layout.notification_bus_tracker_compact).apply {
             setTextViewText(R.id.tv_route_title, data.title)
             setTextViewText(R.id.tv_eta_primary, data.primaryEtaText)
             setTextViewText(R.id.tv_arrival_time, data.arrivalTimeText)
             setProgressBar(R.id.notification_progress, 100, data.progress, false)
+
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                val maxMarginDp = 240f
+                val marginDp = (data.progress / 100f * maxMarginDp).coerceIn(0f, maxMarginDp)
+                setViewLayoutMargin(R.id.fl_bus_thumb, RemoteViews.MARGIN_START, marginDp, TypedValue.COMPLEX_UNIT_DIP)
+            }
         }
 
-        // Expanded Card RemoteViews
         val expandedViews = RemoteViews(packageName, R.layout.notification_bus_tracker).apply {
             setTextViewText(R.id.tv_route_title, data.title)
             setTextViewText(R.id.tv_route_badge, data.primaryRoute)
@@ -299,17 +448,20 @@ class TrackingService : Service() {
             setTextViewText(R.id.tv_arrival_time, data.arrivalTimeText)
             setProgressBar(R.id.notification_progress, 100, data.progress, false)
             setTextViewText(R.id.tv_upcoming, data.upcomingText)
+
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                val maxMarginDp = 280f
+                val marginDp = (data.progress / 100f * maxMarginDp).coerceIn(0f, maxMarginDp)
+                setViewLayoutMargin(R.id.fl_bus_thumb, RemoteViews.MARGIN_START, marginDp, TypedValue.COMPLEX_UNIT_DIP)
+            }
         }
 
-        Log.d("BusNotif", "RemoteViews inflated OK")
-
-        // Public version displayed when lockscreen content is set to private
         val publicNotification = NotificationCompat.Builder(this, CHANNEL_ID)
             .setSmallIcon(R.mipmap.ic_launcher)
             .setContentTitle(data.title)
             .setContentText("${data.primaryRoute}: ${data.primaryEtaText} (${data.arrivalTimeText})")
             .setOngoing(true)
-            .setPriority(NotificationCompat.PRIORITY_MAX)
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
             .build()
 
@@ -327,10 +479,10 @@ class TrackingService : Service() {
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
             .setPublicVersion(publicNotification)
             .setCategory(NotificationCompat.CATEGORY_NAVIGATION)
-            .setPriority(NotificationCompat.PRIORITY_MAX)
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
             .addExtras(extras)
-            .addAction(android.R.drawable.ic_menu_revert, "Reverse Route", pendingReverse)
-            .addAction(android.R.drawable.ic_menu_close_clear_cancel, "Stop Tracking", pendingStop)
+            .addAction(R.drawable.ic_action_reverse, "Reverse Route", pendingReverse)
+            .addAction(R.drawable.ic_action_stop, "Stop Tracking", pendingStop)
             .build()
     }
 
@@ -342,17 +494,20 @@ class TrackingService : Service() {
                 manager?.deleteNotificationChannel("TrackingChannel_v2")
                 manager?.deleteNotificationChannel("TrackingChannel_v3")
                 manager?.deleteNotificationChannel("BusTracker_RichCard_v4")
+                manager?.deleteNotificationChannel("BusTracker_Public_v5")
+                manager?.deleteNotificationChannel("bus_tracker_v3")
             } catch (e: Exception) {
                 e.printStackTrace()
             }
 
             val channel = NotificationChannel(
-                CHANNEL_ID,
-                "Bus Live Tracker",
+                "bus_tracker_live",
+                "Bus Tracker Live",
                 NotificationManager.IMPORTANCE_HIGH
             ).apply {
-                description = "Live persistent bus tracker notification card"
+                description = "Live persistent bus tracker Live Alert status bar pill"
                 lockscreenVisibility = Notification.VISIBILITY_PUBLIC
+                setShowBadge(true)
             }
             manager.createNotificationChannel(channel)
         }
@@ -362,6 +517,7 @@ class TrackingService : Service() {
 
     override fun onDestroy() {
         super.onDestroy()
+        isServiceRunning = false
         job.cancel()
     }
 }

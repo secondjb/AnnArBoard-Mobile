@@ -34,20 +34,19 @@ data class BusAlert(
 fun ActionBoard(
     alerts: List<BusAlert>,
     loading: Boolean,
-    modifier: Modifier = Modifier,
-    onStartTracking: ((BusAlert) -> Unit)? = null
+    modifier: Modifier = Modifier
 ) {
     Column(
         modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp),
+            .padding(horizontal = 12.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         if (loading) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.Center,
-                modifier = Modifier.padding(bottom = 16.dp)
+                modifier = Modifier.padding(bottom = 12.dp)
             ) {
                 CircularProgressIndicator(
                     modifier = Modifier.size(16.dp),
@@ -71,7 +70,7 @@ fun ActionBoard(
             modifier = Modifier.fillMaxWidth()
         ) {
             alerts.forEachIndexed { index, alert ->
-                ActionBoardCard(alert = alert, index = index, onStartTracking = onStartTracking)
+                ActionBoardCard(alert = alert, index = index)
             }
         }
     }
@@ -99,11 +98,20 @@ fun getMuiContrastText(bg: Color): Color {
     return if (bg.luminance() > 0.5f) Color.Black.copy(alpha = 0.87f) else Color.White
 }
 
+fun cleanLocationName(raw: String): String {
+    return raw
+        .replace("Central Campus Transit Center", "CCTC", ignoreCase = true)
+        .replace("Central Campus (CCTC)", "CCTC", ignoreCase = true)
+        .replace(Regex("Ruthven\\s+Mue?seum?s?", RegexOption.IGNORE_CASE), "Ruthven")
+        .replace(":", " ")
+        .replace(Regex("\\s+"), " ")
+        .trim()
+}
+
 @Composable
 fun ActionBoardCard(
     alert: BusAlert,
-    index: Int,
-    onStartTracking: ((BusAlert) -> Unit)? = null
+    index: Int
 ) {
     val baseColor = MaterialTheme.colorScheme.primary
     val isDark = MaterialTheme.colorScheme.background.luminance() < 0.5f
@@ -133,14 +141,14 @@ fun ActionBoardCard(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 20.dp),
+                    .padding(horizontal = 12.dp, vertical = 16.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Box(
                     modifier = Modifier
-                        .size(44.dp)
+                        .size(38.dp)
                         .background(if (isDark) Color.Black.copy(alpha = 0.3f) else Color.White.copy(alpha = 0.6f), CircleShape)
-                        .padding(10.dp),
+                        .padding(8.dp),
                     contentAlignment = Alignment.Center
                 ) {
                     Box(
@@ -152,42 +160,31 @@ fun ActionBoardCard(
                     )
                 }
 
-                Spacer(modifier = Modifier.width(16.dp))
+                Spacer(modifier = Modifier.width(10.dp))
 
                 Column(modifier = Modifier.weight(1f)) {
-                    val s = if (alert.leaveInMinutes != 1) "s" else ""
+                    val titleText = if (alert.leaveInMinutes <= 0) {
+                        "Arriving now for ${alert.bus}"
+                    } else {
+                        val s = if (alert.leaveInMinutes != 1) "s" else ""
+                        "Arriving in ${alert.leaveInMinutes} min$s for ${alert.bus}"
+                    }
+                    val displayLocation = cleanLocationName(alert.location)
+
                     Text(
-                        text = "Arriving in ${alert.leaveInMinutes} min$s for ${alert.bus}",
+                        text = titleText,
                         color = textColor,
                         fontWeight = FontWeight.ExtraBold,
-                        fontSize = 20.sp
+                        fontSize = 19.sp
                     )
-                    Spacer(modifier = Modifier.height(4.dp))
+                    Spacer(modifier = Modifier.height(2.dp))
                     Text(
-                        text = "at ${alert.location}",
+                        text = "at $displayLocation",
                         color = textColor.copy(alpha = 0.9f),
                         fontWeight = FontWeight.Medium,
-                        fontSize = 15.sp
+                        fontSize = 14.sp
                     )
                 }
-            }
-        }
-
-        if (onStartTracking != null) {
-            IconButton(
-                onClick = { onStartTracking(alert) },
-                modifier = Modifier
-                    .align(Alignment.BottomEnd)
-                    .padding(8.dp)
-                    .size(36.dp)
-                    .background(textColor.copy(alpha = 0.18f), CircleShape)
-            ) {
-                Icon(
-                    imageVector = Icons.Default.DirectionsBus,
-                    contentDescription = "Track Live",
-                    tint = textColor,
-                    modifier = Modifier.size(20.dp)
-                )
             }
         }
     }

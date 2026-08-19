@@ -50,5 +50,9 @@ object MBusWidgetRepository {
         return raw
             .replace("Central Campus Transit Center", "CCTC", ignoreCase = true)
             .replace("Pierpont Commons", "Pierpont", ignoreCase = true)
+            .replace(Regex("Ruthven\\s+Mue?seum?s?", RegexOption.IGNORE_CASE), "Ruthven")
+            .replace(":", " ")
+            .replace(Regex("\\s+"), " ")
+            .trim()
     }
 }

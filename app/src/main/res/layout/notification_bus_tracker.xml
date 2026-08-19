@@ -4,7 +4,7 @@
     android:layout_height="wrap_content"
     android:orientation="vertical"
     android:padding="16dp"
-    android:background="#0F172A">
+    android:background="@android:color/transparent">
 
     <!-- Header Row: Route Title & Badge -->
     <RelativeLayout
@@ -50,7 +50,7 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:text="NEXT BUS"
-        android:textColor="#94A3B8"
+        android:textColor="#CCCCCC"
         android:textSize="11sp"
         android:textStyle="bold"
         android:letterSpacing="0.05" />
@@ -75,18 +75,47 @@
         android:textColor="#E2E8F0"
         android:textSize="14sp" />
 
-    <!-- Horizontal Progress Bar -->
-    <ProgressBar
-        android:id="@+id/notification_progress"
-        style="?android:attr/progressBarStyleHorizontal"
+    <!-- Google Maps Navigation Style Progress Track & Circular Thumb -->
+    <RelativeLayout
+        android:id="@+id/rl_progress_container"
         android:layout_width="match_parent"
-        android:layout_height="6dp"
-        android:layout_marginTop="12dp"
-        android:layout_marginBottom="12dp"
-        android:max="100"
-        android:progress="40"
-        android:progressTint="#FFCB05"
-        android:progressBackgroundTint="#334155" />
+        android:layout_height="32dp"
+        android:layout_marginTop="8dp"
+        android:layout_marginBottom="8dp">
+
+        <View
+            android:id="@+id/view_track_bg"
+            android:layout_width="match_parent"
+            android:layout_height="6dp"
+            android:layout_centerVertical="true"
+            android:background="@drawable/bg_progress_track_rounded" />
+
+        <ProgressBar
+            android:id="@+id/notification_progress"
+            style="?android:attr/progressBarStyleHorizontal"
+            android:layout_width="match_parent"
+            android:layout_height="6dp"
+            android:layout_centerVertical="true"
+            android:max="100"
+            android:progress="40"
+            android:progressDrawable="@drawable/drawable_progress_bar_rounded" />
+
+        <FrameLayout
+            android:id="@+id/fl_bus_thumb"
+            android:layout_width="26dp"
+            android:layout_height="26dp"
+            android:layout_centerVertical="true"
+            android:background="@drawable/bg_bus_thumb_circle">
+
+            <ImageView
+                android:id="@+id/iv_bus_thumb_icon"
+                android:layout_width="16dp"
+                android:layout_height="16dp"
+                android:layout_gravity="center"
+                android:src="@drawable/ic_bus_dark" />
+        </FrameLayout>
+
+    </RelativeLayout>
 
     <!-- Secondary Upcoming Buses -->
     <TextView
@@ -94,7 +123,7 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:text="Also coming: 17 min, 27 min"
-        android:textColor="#94A3B8"
+        android:textColor="#CCCCCC"
         android:textSize="13sp" />
 
 </LinearLayout>
